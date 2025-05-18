@@ -206,8 +206,66 @@
             margin-bottom: 5px;
         }
         
-        /* 添加响应式设计 */
-        @media (max-width: 600px) {
+        /* 虚拟键盘样式 */
+        .virtual-keyboard {
+            width: 100%;
+            margin-top: 25px;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+        
+        .keyboard-row {
+            display: flex;
+            justify-content: center;
+            gap: 5px;
+        }
+        
+        .key {
+            width: 38px;
+            height: 38px;
+            background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+            border-radius: 8px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: 14px;
+            font-weight: bold;
+            color: #2c3e50;
+            cursor: pointer;
+            user-select: none;
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+            transition: all 0.15s ease;
+        }
+        
+        .key:hover {
+            background: linear-gradient(135deg, #e9ecef 0%, #dee2e6 100%);
+        }
+        
+        .key:active, .key.active {
+            transform: translateY(2px);
+            box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+            background: linear-gradient(135deg, #3498db 0%, #2980b9 100%);
+            color: white;
+        }
+        
+        .key.special {
+            width: auto;
+            padding: 0 10px;
+            min-width: 50px;
+        }
+        
+        .keyboard-toggle {
+            margin-top: 15px;
+            font-size: 14px;
+            color: #3a4f63;
+            cursor: pointer;
+            text-decoration: underline;
+            user-select: none;
+        }
+        
+        /* 响应式设计 */
+        @media (max-width: 700px) {
             .container {
                 padding: 20px;
                 width: 95%;
@@ -235,6 +293,29 @@
             .stats {
                 flex-direction: column;
                 gap: 10px;
+            }
+            
+            .key {
+                width: 32px;
+                height: 32px;
+                font-size: 12px;
+            }
+            
+            .key.special {
+                min-width: 40px;
+            }
+        }
+        
+        @media (max-width: 400px) {
+            .key {
+                width: 28px;
+                height: 28px;
+                font-size: 11px;
+                border-radius: 6px;
+            }
+            
+            .keyboard-row {
+                gap: 3px;
             }
         }
     </style>
@@ -266,9 +347,30 @@
             <button id="startBtn">开始游戏</button>
             <button id="resetBtn">重置游戏</button>
         </div>
+        
+        <!-- 虚拟键盘 -->
+        <div class="virtual-keyboard" id="virtualKeyboard">
+            <div class="keyboard-row" id="row1">
+                <!-- 第一行将由JS填充 -->
+            </div>
+            <div class="keyboard-row" id="row2">
+                <!-- 第二行将由JS填充 -->
+            </div>
+            <div class="keyboard-row" id="row3">
+                <!-- 第三行将由JS填充 -->
+            </div>
+            <div class="keyboard-row" id="row4">
+                <!-- 第四行将由JS填充 -->
+            </div>
+            <div class="keyboard-row" id="row5">
+                <!-- 特殊字符行将由JS填充 -->
+            </div>
+        </div>
+        <div class="keyboard-toggle" id="keyboardToggle">隐藏虚拟键盘</div>
+        
         <div class="instructions">
             <h3>游戏说明:</h3>
-            <p>当字母从屏幕顶部落下时，请按下对应的键盘按键。越快越好!</p>
+            <p>当字母从屏幕顶部落下时，请按下对应的键盘按键或点击虚拟键盘。越快越好!</p>
             <h3>难度级别:</h3>
             <ul>
                 <li>简单: 只有小写字母 a-z</li>
@@ -287,6 +389,8 @@
             const errorsElement = document.getElementById('errors');
             const accuracyElement = document.getElementById('accuracy');
             const levelButtons = document.querySelectorAll('.level-btn');
+            const virtualKeyboard = document.getElementById('virtualKeyboard');
+            const keyboardToggle = document.getElementById('keyboardToggle');
             
             let isGameRunning = false;
             let gameInterval;
@@ -295,6 +399,7 @@
             let totalAttempts = 0;
             let activeLetters = [];
             let currentLevel = 'easy';
+            let keyboardVisible = true;
             
             // 字符集定义
             const charSets = {
@@ -310,6 +415,9 @@
                 hard: { interval: 1100, speed: 4.5 }
             };
             
+            // 初始化虚拟键盘
+            initVirtualKeyboard();
+            
             // 设置难度级别
             levelButtons.forEach(button => {
                 button.addEventListener('click', function() {
@@ -318,6 +426,9 @@
                     levelButtons.forEach(btn => btn.classList.remove('active'));
                     this.classList.add('active');
                     currentLevel = this.dataset.level;
+                    
+                    // 根据难度更新键盘显示
+                    updateKeyboardVisibility();
                 });
             });
             
@@ -350,11 +461,32 @@
                 }, 300);
             });
             
-            // 监听键盘输入
+            // 键盘显示切换
+            keyboardToggle.addEventListener('click', function() {
+                keyboardVisible = !keyboardVisible;
+                virtualKeyboard.style.display = keyboardVisible ? 'flex' : 'none';
+                keyboardToggle.textContent = keyboardVisible ? '隐藏虚拟键盘' : '显示虚拟键盘';
+            });
+            
+            // 监听实体键盘输入
             document.addEventListener('keydown', function(event) {
+                const key = event.key;
+                handleKeyPress(key);
+                
+                // 视觉反馈：高亮虚拟键盘上的按键
+                highlightVirtualKey(key);
+            });
+            
+            document.addEventListener('keyup', function(event) {
+                // 移除键盘上的高亮
+                const key = event.key;
+                unhighlightVirtualKey(key);
+            });
+            
+            // 处理按键
+            function handleKeyPress(key) {
                 if (!isGameRunning) return;
                 
-                const key = event.key;
                 let letterFound = false;
                 
                 for (let i = 0; i < activeLetters.length; i++) {
@@ -390,7 +522,7 @@
                         gameArea.style.boxShadow = 'inset 0 0 15px rgba(0, 0, 0, 0.05)';
                     }, 300);
                 }
-            });
+            }
             
             // 创建字母
             function createLetter() {
@@ -481,6 +613,101 @@
                 
                 // 重置游戏区域样式
                 gameArea.style.boxShadow = 'inset 0 0 15px rgba(0, 0, 0, 0.05)';
+            }
+            
+            // 初始化虚拟键盘
+            function initVirtualKeyboard() {
+                // 定义键盘布局
+                const layout = [
+                    ['1', '2', '3', '4', '5', '6', '7', '8', '9', '0'],
+                    ['q', 'w', 'e', 'r', 't', 'y', 'u', 'i', 'o', 'p'],
+                    ['a', 's', 'd', 'f', 'g', 'h', 'j', 'k', 'l'],
+                    ['z', 'x', 'c', 'v', 'b', 'n', 'm'],
+                    ['!', '@', '#', '$', '%', '^', '&', '*', '(', ')', '_', '+', '-', '=', '[', ']', '{', '}', '|', ';', ':', ',', '.', '<', '>', '?']
+                ];
+                
+                // 创建键盘行
+                for (let i = 0; i < layout.length; i++) {
+                    const rowElement = document.getElementById(`row${i+1}`);
+                    
+                    layout[i].forEach(key => {
+                        const keyElement = document.createElement('div');
+                        keyElement.className = 'key';
+                        keyElement.dataset.key = key;
+                        keyElement.textContent = key;
+                        
+                        // 为最后一行（特殊符号）添加特殊样式
+                        if (i === 4) {
+                            keyElement.classList.add('special');
+                        }
+                        
+                        // 添加点击事件
+                        keyElement.addEventListener('mousedown', function() {
+                            handleKeyPress(key);
+                            this.classList.add('active');
+                        });
+                        
+                        keyElement.addEventListener('mouseup', function() {
+                            this.classList.remove('active');
+                        });
+                        
+                        keyElement.addEventListener('mouseleave', function() {
+                            this.classList.remove('active');
+                        });
+                        
+                        keyElement.addEventListener('touchstart', function(e) {
+                            e.preventDefault();
+                            handleKeyPress(key);
+                            this.classList.add('active');
+                        });
+                        
+                        keyElement.addEventListener('touchend', function(e) {
+                            e.preventDefault();
+                            this.classList.remove('active');
+                        });
+                        
+                        rowElement.appendChild(keyElement);
+                    });
+                }
+                
+                // 初始显示键盘基于难度
+                updateKeyboardVisibility();
+            }
+            
+            // 更新键盘可见性基于当前难度
+            function updateKeyboardVisibility() {
+                const row1 = document.getElementById('row1');
+                const row5 = document.getElementById('row5');
+                
+                if (currentLevel === 'easy') {
+                    // 简单模式隐藏数字和特殊字符行
+                    row1.style.display = 'none';
+                    row5.style.display = 'none';
+                } else if (currentLevel === 'medium') {
+                    // 中等模式只显示字母和数字
+                    row1.style.display = 'flex';
+                    row5.style.display = 'none';
+                } else {
+                    // 困难模式显示所有行
+                    row1.style.display = 'flex';
+                    row5.style.display = 'flex';
+                }
+            }
+            
+            // 高亮虚拟键盘按键
+            function highlightVirtualKey(key) {
+                const keyElement = document.querySelector(`.key[data-key="${key}"]`);
+                if (keyElement) {
+                    keyElement.classList.add('active');
+                }
+            }
+            
+            // 移除虚拟键盘按键高亮
+            function unhighlightVirtualKey(key) {
+                const keyElement = document.querySelector(`.key[data-key="${key}"]`);
+                if (keyElement) {
+                    keyElement.classList.remove('active');
+                }
             }
         });
     </script>
